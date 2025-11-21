@@ -1,0 +1,127 @@
+{
+  "info": {
+    "name": "WhatsApp Lending Bot - API Collection",
+    "description": "Collection for testing WhatsApp webhook endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Webhook Verification (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/webhook?hub.mode=subscribe&hub.verify_token=YOUR_VERIFY_TOKEN_HERE&hub.challenge=test_challenge_123",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["webhook"],
+          "query": [
+            {
+              "key": "hub.mode",
+              "value": "subscribe"
+            },
+            {
+              "key": "hub.verify_token",
+              "value": "YOUR_VERIFY_TOKEN_HERE",
+              "description": "Must match the value in application.properties"
+            },
+            {
+              "key": "hub.challenge",
+              "value": "test_challenge_123"
+            }
+          ]
+        },
+        "description": "Test webhook verification - should return the challenge string"
+      }
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/webhook/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["webhook", "health"]
+        },
+        "description": "Check if the webhook service is running"
+      }
+    },
+    {
+      "name": "Simulate WhatsApp Message (POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"WHATSAPP_BUSINESS_ACCOUNT_ID\",\n      \"changes\": [\n        {\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"15550000000\",\n              \"phone_number_id\": \"PHONE_NUMBER_ID\"\n            },\n            \"contacts\": [\n              {\n                \"profile\": {\n                  \"name\": \"Test User\"\n                },\n                \"wa_id\": \"919876543210\"\n              }\n            ],\n            \"messages\": [\n              {\n                \"from\": \"919876543210\",\n                \"id\": \"wamid.test123456\",\n                \"timestamp\": \"1234567890\",\n                \"text\": {\n                  \"body\": \"Hi\"\n                },\n                \"type\": \"text\"\n              }\n            ]\n          },\n          \"field\": \"messages\"\n        }\n      ]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/webhook",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["webhook"]
+        },
+        "description": "Simulate an incoming WhatsApp message - test message: 'Hi'"
+      }
+    },
+    {
+      "name": "Test Message - Provide Name",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"WHATSAPP_BUSINESS_ACCOUNT_ID\",\n      \"changes\": [\n        {\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"15550000000\",\n              \"phone_number_id\": \"PHONE_NUMBER_ID\"\n            },\n            \"contacts\": [\n              {\n                \"profile\": {\n                  \"name\": \"John Doe\"\n                },\n                \"wa_id\": \"919876543210\"\n              }\n            ],\n            \"messages\": [\n              {\n                \"from\": \"919876543210\",\n                \"id\": \"wamid.test123457\",\n                \"timestamp\": \"1234567891\",\n                \"text\": {\n                  \"body\": \"John Doe\"\n                },\n                \"type\": \"text\"\n              }\n            ]\n          },\n          \"field\": \"messages\"\n        }\n      ]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/webhook",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["webhook"]
+        },
+        "description": "Simulate user providing their name"
+      }
+    },
+    {
+      "name": "Test Message - Select Loan Type",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"WHATSAPP_BUSINESS_ACCOUNT_ID\",\n      \"changes\": [\n        {\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"15550000000\",\n              \"phone_number_id\": \"PHONE_NUMBER_ID\"\n            },\n            \"contacts\": [\n              {\n                \"profile\": {\n                  \"name\": \"John Doe\"\n                },\n                \"wa_id\": \"919876543210\"\n              }\n            ],\n            \"messages\": [\n              {\n                \"from\": \"919876543210\",\n                \"id\": \"wamid.test123458\",\n                \"timestamp\": \"1234567892\",\n                \"text\": {\n                  \"body\": \"1\"\n                },\n                \"type\": \"text\"\n              }\n            ]\n          },\n          \"field\": \"messages\"\n        }\n      ]\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/webhook",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["webhook"]
+        },
+        "description": "Simulate user selecting Personal Loan (option 1)"
+      }
+    }
+  ]
+}
+
