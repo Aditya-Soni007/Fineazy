@@ -57,13 +57,6 @@
 			<artifactId>jackson-databind</artifactId>
 		</dependency>
 		
-		<!-- Lombok for reducing boilerplate code (optional) -->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<optional>true</optional>
-		</dependency>
-		
 	<!-- Logging -->
 	<dependency>
 		<groupId>org.slf4j</groupId>

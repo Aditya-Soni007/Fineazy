@@ -38,38 +38,24 @@ CREATE TABLE
         name VARCHAR(100),
         pan VARCHAR(10),
         aadhaar VARCHAR(12),
+        current_stage VARCHAR(50),
         INDEX idx_application_id (application_id),
         INDEX idx_pan (pan)
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
--- Table: stage_tracker
--- Tracks user journey through the application process
-CREATE TABLE
-    IF NOT EXISTS stage_tracker (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        application_id VARCHAR(50),
-        mobile_id VARCHAR(20) NOT NULL,
-        current_stage VARCHAR(50),
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_mobile_id (mobile_id),
-        INDEX idx_application_id (application_id),
-        INDEX idx_current_stage (current_stage)
-    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
-
 -- Sample queries for monitoring
 -- Check all active users
--- SELECT mobile_id, current_stage, last_updated FROM stage_tracker ORDER BY last_updated DESC;
+-- SELECT mobile_id, current_stage FROM user_details ORDER BY mobile_id DESC;
 -- Check user conversation history
 -- SELECT * FROM chat_history WHERE mobile_number = 'YOUR_MOBILE_NUMBER' ORDER BY time_stamp DESC;
 -- Check user details
 -- SELECT * FROM user_details WHERE mobile_id = 'YOUR_MOBILE_NUMBER';
 -- Count users by stage
--- SELECT current_stage, COUNT(*) as user_count FROM stage_tracker GROUP BY current_stage;
+-- SELECT current_stage, COUNT(*) as user_count FROM user_details GROUP BY current_stage;
 -- Recent applications
--- SELECT u.name, u.application_id, s.current_stage, s.last_updated 
--- FROM user_details u 
--- JOIN stage_tracker s ON u.mobile_id = s.mobile_id 
--- ORDER BY s.last_updated DESC 
+-- SELECT name, application_id, current_stage 
+-- FROM user_details
+-- ORDER BY application_id DESC 
 -- LIMIT 10;
 -- Table: config_properties
 -- Generic key-value configuration storage (e.g. WhatsApp tokens)

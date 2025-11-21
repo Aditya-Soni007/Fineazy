@@ -22,16 +22,24 @@ public class UserDetails {
     @Column(name = "aadhaar", length = 12)
     private String aadhaar;
     
+    @Column(name = "current_stage", length = 50)
+    private String currentStage;
+    
     // Constructors
     public UserDetails() {
     }
     
     public UserDetails(String mobileId, String applicationId, String name, String pan, String aadhaar) {
+        this(mobileId, applicationId, name, pan, aadhaar, null);
+    }
+    
+    public UserDetails(String mobileId, String applicationId, String name, String pan, String aadhaar, String currentStage) {
         this.mobileId = mobileId;
         this.applicationId = applicationId;
         this.name = name;
         this.pan = pan;
         this.aadhaar = aadhaar;
+        this.currentStage = currentStage;
     }
     
     // Getters and Setters
@@ -73,6 +81,14 @@ public class UserDetails {
     
     public void setAadhaar(String aadhaar) {
         this.aadhaar = aadhaar;
+    }
+    
+    public String getCurrentStage() {
+        return currentStage;
+    }
+    
+    public void setCurrentStage(String currentStage) {
+        this.currentStage = currentStage;
     }
 }
 

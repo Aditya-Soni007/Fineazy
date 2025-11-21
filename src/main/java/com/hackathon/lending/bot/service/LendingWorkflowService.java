@@ -1,10 +1,9 @@
 package com.hackathon.lending.bot.service;
 
-import com.hackathon.lending.bot.entity.StageTracker;
 import com.hackathon.lending.bot.entity.UserDetails;
-import com.hackathon.lending.bot.repository.StageTrackerRepository;
 import com.hackathon.lending.bot.repository.UserDetailsRepository;
 import com.hackathon.lending.bot.utility.ApplicationStages;
+import com.hackathon.lending.bot.utility.ApplicationStages.StageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,42 +18,38 @@ public class LendingWorkflowService {
     private static final Logger logger = LoggerFactory.getLogger(LendingWorkflowService.class);
     
     @Autowired
-    private StageTrackerRepository stageTrackerRepository;
-    
-    @Autowired
     private UserDetailsRepository userDetailsRepository;
     
     /**
      * Process user input based on current stage
      */
-    public String processUserInput(String mobileId, String userInput, String currentStage) {
-        logger.info("Processing input for stage: {}", currentStage);
+    public String processUserInput(String mobileId, String userInput, String currentStageValue) {
+        ApplicationStages currentStage = ApplicationStages.fromValue(currentStageValue);
+        logger.info("Processing input for stage: {}", currentStage.name());
         
-        switch (currentStage) {
-            case ApplicationStages.ONBOARDING:
+        StageType stageType = currentStage.getStageType();
+        switch (stageType) {
+            case ONBOARDING:
                 return handleOnboarding(mobileId, userInput);
-                
-            case ApplicationStages.CREATE_APPLICATION:
+            case APPLICATION_CREATION:
                 return handleCreateApplication(mobileId, userInput);
-                
-            case ApplicationStages.KYC:
+            case APPLICATION_UPDATE:
+                return handleApplicationUpdate(mobileId, userInput);
+            case KYC:
                 return handleKYC(mobileId, userInput);
-                
-            case ApplicationStages.ELIGIBILITY:
+            case ELIGIBILITY:
                 return handleEligibility(mobileId, userInput);
-                
-            case ApplicationStages.OFFER:
+            case OFFER:
+            case OFFER_ACCEPTANCE:
                 return handleOffer(mobileId, userInput);
-                
-            case ApplicationStages.DOCUMENTS_VERIFICATION:
+            case DOCUMENTS_VERIFICATION:
                 return handleDocumentsVerification(mobileId, userInput);
-                
-            case ApplicationStages.DISBURSAL:
+            case DOCUMENT_SIGNING:
+                return handleDocumentSigning(mobileId, userInput);
+            case DISBURSAL:
                 return handleDisbursal(mobileId, userInput);
-                
-            case ApplicationStages.POST_DISBURSAL:
+            case POST_DISBURSAL:
                 return handlePostDisbursal(mobileId, userInput);
-                
             default:
                 return "Invalid stage. Please contact support.";
         }
@@ -70,12 +65,17 @@ public class LendingWorkflowService {
         
         // If user provided a name, move to next stage
         if (userInput != null && !userInput.trim().isEmpty() && userInput.length() > 2) {
-            UserDetails userDetails = new UserDetails();
-            userDetails.setMobileId(mobileId);
+            UserDetails userDetails = userDetailsRepository.findById(mobileId)
+                    .orElseGet(() -> {
+                        UserDetails newUser = new UserDetails();
+                        newUser.setMobileId(mobileId);
+                        newUser.setCurrentStage(ApplicationStages.defaultStage().name());
+                        return newUser;
+                    });
             userDetails.setName(userInput.trim());
             userDetailsRepository.save(userDetails);
             
-            updateStage(mobileId, ApplicationStages.CREATE_APPLICATION);
+            updateStage(mobileId, ApplicationStages.APPLICATION_CREATION_IN_PROGRESS);
             
             response = String.format("Thank you, %s! ✅\n\n" +
                     "Now let's create your loan application.\n\n" +
@@ -99,17 +99,9 @@ public class LendingWorkflowService {
             UserDetails userDetails = userDetailsOpt.get();
             userDetails.setApplicationId(applicationId);
             userDetailsRepository.save(userDetails);
-            
-            // Update application ID in stage tracker
-            Optional<StageTracker> trackerOpt = stageTrackerRepository.findByMobileId(mobileId);
-            if (trackerOpt.isPresent()) {
-                StageTracker tracker = trackerOpt.get();
-                tracker.setApplicationId(applicationId);
-                stageTrackerRepository.save(tracker);
-            }
         }
         
-        updateStage(mobileId, ApplicationStages.KYC);
+        updateStage(mobileId, ApplicationStages.KYC_IN_PROGRESS);
         
         return String.format("Great! Your application ID is: %s\n\n" +
                 "Now let's complete your KYC (Know Your Customer) process.\n\n" +
@@ -136,7 +128,7 @@ public class LendingWorkflowService {
                 userDetails.setAadhaar(userInput.trim());
                 userDetailsRepository.save(userDetails);
                 
-                updateStage(mobileId, ApplicationStages.ELIGIBILITY);
+                updateStage(mobileId, ApplicationStages.ELIGIBILITY_IN_PROGRESS);
                 
                 return "KYC details saved successfully! ✅\n\n" +
                         "Checking your eligibility... Please wait.";
@@ -151,7 +143,7 @@ public class LendingWorkflowService {
      */
     private String handleEligibility(String mobileId, String userInput) {
         // Mock eligibility check
-        updateStage(mobileId, ApplicationStages.OFFER);
+        updateStage(mobileId, ApplicationStages.OFFER_ACCEPTANCE_IN_PROGRESS);
         
         return "Great news! You are eligible for a loan! 🎉\n\n" +
                 "Based on your profile, we can offer you:\n\n" +
@@ -167,7 +159,7 @@ public class LendingWorkflowService {
      */
     private String handleOffer(String mobileId, String userInput) {
         if (userInput.trim().equalsIgnoreCase("YES")) {
-            updateStage(mobileId, ApplicationStages.DOCUMENTS_VERIFICATION);
+            updateStage(mobileId, ApplicationStages.DOCUMENTS_VERIFICATION_IN_PROGRESS);
             
             return "Excellent! 🎊\n\n" +
                     "Now we need to verify some documents.\n\n" +
@@ -177,6 +169,7 @@ public class LendingWorkflowService {
                     "3. Bank statements (last 6 months)\n\n" +
                     "Reply 'DONE' once you have the documents ready.";
         } else if (userInput.trim().equalsIgnoreCase("NO")) {
+            updateStage(mobileId, ApplicationStages.OFFER_DECLINED);
             return "No problem! If you change your mind, feel free to reach out.\n\n" +
                     "Is there anything else I can help you with?";
         }
@@ -189,7 +182,7 @@ public class LendingWorkflowService {
      */
     private String handleDocumentsVerification(String mobileId, String userInput) {
         if (userInput.trim().equalsIgnoreCase("DONE")) {
-            updateStage(mobileId, ApplicationStages.DISBURSAL);
+            updateStage(mobileId, ApplicationStages.DISBURSAL_IN_PROGRESS);
             
             return "Documents received! 📄✅\n\n" +
                     "Our team will verify your documents within 24 hours.\n" +
@@ -204,7 +197,7 @@ public class LendingWorkflowService {
      * Handle disbursal stage
      */
     private String handleDisbursal(String mobileId, String userInput) {
-        updateStage(mobileId, ApplicationStages.POST_DISBURSAL);
+        updateStage(mobileId, ApplicationStages.POST_DISBURSAL_IN_PROGRESS);
         
         return "🎉 Congratulations! 🎉\n\n" +
                 "Your loan has been disbursed!\n" +
@@ -235,13 +228,23 @@ public class LendingWorkflowService {
     /**
      * Update stage for user
      */
-    private void updateStage(String mobileId, String newStage) {
-        Optional<StageTracker> trackerOpt = stageTrackerRepository.findByMobileId(mobileId);
-        if (trackerOpt.isPresent()) {
-            StageTracker tracker = trackerOpt.get();
-            tracker.setCurrentStage(newStage);
-            stageTrackerRepository.save(tracker);
+    private String handleApplicationUpdate(String mobileId, String userInput) {
+        return "Application update journey is currently in progress. Please hold on while we complete this step.";
+    }
+    
+    private String handleDocumentSigning(String mobileId, String userInput) {
+        return "Document signing is in progress. We will notify you once the documents are signed.";
+    }
+    
+    private void updateStage(String mobileId, ApplicationStages newStage) {
+        Optional<UserDetails> userDetailsOpt = userDetailsRepository.findById(mobileId);
+        if (userDetailsOpt.isPresent()) {
+            UserDetails userDetails = userDetailsOpt.get();
+            userDetails.setCurrentStage(newStage.name());
+            userDetailsRepository.save(userDetails);
             logger.info("Updated stage for {} to {}", mobileId, newStage);
+        } else {
+            logger.warn("Unable to update stage for {} because user details do not exist", mobileId);
         }
     }
 }
