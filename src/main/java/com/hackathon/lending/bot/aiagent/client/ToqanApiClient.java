@@ -107,7 +107,7 @@ public class ToqanApiClient {
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Accept", "*/*")
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("X-Api-Key", apiKey)
                     .timeout(Duration.ofSeconds(timeoutSeconds))
                     .GET()
                     .build();
