@@ -2,13 +2,19 @@ package com.hackathon.lending.bot.service.processor;
 
 import com.hackathon.lending.bot.dto.MessageContext;
 import com.hackathon.lending.bot.dto.MessageProcessorRequestDTO;
+import com.hackathon.lending.bot.service.LendingWorkflowService;
 import com.hackathon.lending.bot.utility.ApplicationStages;
 import com.hackathon.lending.bot.utility.ApplicationStages.StageType;
 import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 
 public abstract class BaseStageMessageProcessor implements StageMessageProcessor {
-    
+
+    @Autowired
+    private LendingWorkflowService lendingWorkflowService;
+
     private final StageType stageType;
     
     protected BaseStageMessageProcessor(StageType stageType) {
@@ -26,13 +32,35 @@ public abstract class BaseStageMessageProcessor implements StageMessageProcessor
                 .map(MessageContext::getUserName)
                 .filter(StringUtils::hasText)
                 .orElse("there");
-        
+
+
+
         return String.format(
                 "Hey %s, we're currently working on the %s stage (%s). We'll update you shortly.",
                 user,
                 stageType.getDisplayName(),
                 stage.name()
         );
+    }
+
+    protected String processWithWorkflow(MessageProcessorRequestDTO request, ApplicationStages stage) {
+        if (lendingWorkflowService == null || request == null) {
+            return buildDefaultResponse(request, stage);
+        }
+
+        MessageContext context = request.getMessageContext();
+        if (context == null || !StringUtils.hasText(context.getFrom())) {
+            return buildDefaultResponse(request, stage);
+        }
+
+        String response = lendingWorkflowService.processUserInput(
+                request,
+                stage.name());
+
+        if (!StringUtils.hasText(response)) {
+            return buildDefaultResponse(request, stage);
+        }
+        return response;
     }
 }
 

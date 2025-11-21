@@ -32,7 +32,7 @@ public class LendingWorkflowService {
     /**
      * Process user input based on current stage
      */
-    public String processUserInput(MessageProcessorRequestDTO request) {
+    public String processUserInput(MessageProcessorRequestDTO request,String currentStage) {
         if (request == null || request.getUserDetails() == null || request.getMessageContext() == null) {
             logger.error("Invalid request: request or userDetails or messageContext is null");
             return "Invalid request. Please contact support.";
@@ -40,13 +40,12 @@ public class LendingWorkflowService {
         
         UserDetails userDetails = request.getUserDetails();
         String mobileId = userDetails.getMobileId();
-        String currentStageValue = userDetails.getCurrentStage();
         String userInput = request.getMessageContext().getMessageBody();
         
-        ApplicationStages currentStage = ApplicationStages.fromValue(currentStageValue);
-        logger.info("Processing input for stage: {} from mobileId: {}", currentStage.name(), mobileId);
+        ApplicationStages currentStageVal = ApplicationStages.fromValue(currentStage);
+        logger.info("Processing input for stage: {} from mobileId: {}", currentStageVal.name(), mobileId);
         
-        StageType stageType = currentStage.getStageType();
+        StageType stageType = currentStageVal.getStageType();
         switch (stageType) {
             case ONBOARDING:
                 return handleOnboarding(request);
