@@ -84,8 +84,8 @@ public enum ApplicationStages {
         ApplicationStages resolved = currentStage != null ? currentStage : defaultStage();
         return switch (resolved) {
             case ONBOARDING_IN_PROGRESS -> APPLICATION_CREATION_IN_PROGRESS;
-            case APPLICATION_CREATION_IN_PROGRESS -> KYC_IN_PROGRESS;
-            case APPLICATION_UPDATE_IN_PROGRESS -> APPLICATION_DETAILS_UPDATED;
+            case APPLICATION_CREATION_IN_PROGRESS -> APPLICATION_UPDATE_IN_PROGRESS;
+            case APPLICATION_UPDATE_IN_PROGRESS -> KYC_IN_PROGRESS;
             case KYC_IN_PROGRESS -> ELIGIBILITY_IN_PROGRESS;
             case ELIGIBILITY_IN_PROGRESS -> OFFER_ACCEPTANCE_IN_PROGRESS;
             case OFFER_ACCEPTANCE_IN_PROGRESS -> DOCUMENTS_VERIFICATION_IN_PROGRESS;
