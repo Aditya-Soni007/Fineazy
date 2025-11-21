@@ -1,5 +1,6 @@
 package com.hackathon.lending.bot.service;
 
+import com.hackathon.lending.bot.dto.MessageProcessorRequestDTO;
 import com.hackathon.lending.bot.entity.UserDetails;
 import com.hackathon.lending.bot.repository.UserDetailsRepository;
 import com.hackathon.lending.bot.utility.ApplicationStages;
@@ -8,14 +9,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class LendingWorkflowService {
     
     private static final Logger logger = LoggerFactory.getLogger(LendingWorkflowService.class);
+    
+    // PAN pattern: 5 letters, 4 digits, 1 letter (e.g., ABCDE1234F)
+    private static final Pattern PAN_PATTERN = Pattern.compile("^[A-Z]{5}[0-9]{4}[A-Z]{1}$");
+    
+    // Bank account number pattern: 9-18 digits
+    private static final Pattern BANK_ACCOUNT_PATTERN = Pattern.compile("^[0-9]{9,18}$");
     
     @Autowired
     private UserDetailsRepository userDetailsRepository;
@@ -23,14 +32,24 @@ public class LendingWorkflowService {
     /**
      * Process user input based on current stage
      */
-    public String processUserInput(String mobileId, String userInput, String currentStageValue) {
+    public String processUserInput(MessageProcessorRequestDTO request) {
+        if (request == null || request.getUserDetails() == null || request.getMessageContext() == null) {
+            logger.error("Invalid request: request or userDetails or messageContext is null");
+            return "Invalid request. Please contact support.";
+        }
+        
+        UserDetails userDetails = request.getUserDetails();
+        String mobileId = userDetails.getMobileId();
+        String currentStageValue = userDetails.getCurrentStage();
+        String userInput = request.getMessageContext().getMessageBody();
+        
         ApplicationStages currentStage = ApplicationStages.fromValue(currentStageValue);
-        logger.info("Processing input for stage: {}", currentStage.name());
+        logger.info("Processing input for stage: {} from mobileId: {}", currentStage.name(), mobileId);
         
         StageType stageType = currentStage.getStageType();
         switch (stageType) {
             case ONBOARDING:
-                return handleOnboarding(mobileId, userInput);
+                return handleOnboarding(request);
             case APPLICATION_CREATION:
                 return handleCreateApplication(mobileId, userInput);
             case APPLICATION_UPDATE:
@@ -58,13 +77,25 @@ public class LendingWorkflowService {
     /**
      * Handle onboarding stage
      */
-    private String handleOnboarding(String mobileId, String userInput) {
+    private String handleOnboarding(MessageProcessorRequestDTO request) {
+        String mobileId = getMobileId(request);
+        String userName = getUserName(request);
+        String userInput = getUserInput(request);
+        
         String response = "Welcome to our lending service! 🏦\n\n" +
                 "We help you get loans quickly and easily.\n\n" +
                 "To get started, please reply with your full name.";
         
-        // If user provided a name, move to next stage
-        if (userInput != null && !userInput.trim().isEmpty() && userInput.length() > 2) {
+        // Try to get name from userName first, then from userInput
+        String nameToUse = null;
+        if (userName != null && !userName.trim().isEmpty() && userName.length() > 2) {
+            nameToUse = userName.trim();
+        } else if (userInput != null && !userInput.trim().isEmpty() && userInput.length() > 2) {
+            nameToUse = userInput.trim();
+        }
+        
+        // If we have a valid name, move to next stage
+        if (nameToUse != null) {
             UserDetails userDetails = userDetailsRepository.findById(mobileId)
                     .orElseGet(() -> {
                         UserDetails newUser = new UserDetails();
@@ -72,17 +103,17 @@ public class LendingWorkflowService {
                         newUser.setCurrentStage(ApplicationStages.defaultStage().name());
                         return newUser;
                     });
-            userDetails.setName(userInput.trim());
+            userDetails.setName(nameToUse);
             userDetailsRepository.save(userDetails);
             
             updateStage(mobileId, ApplicationStages.APPLICATION_CREATION_IN_PROGRESS);
             
-            response = String.format("Thank you, %s! ✅\n\n" +
-                    "Now let's create your loan application.\n\n" +
-                    "Would you like to:\n" +
-                    "1. Apply for a Personal Loan\n" +
-                    "2. Apply for a Business Loan\n\n" +
-                    "Please reply with 1 or 2.", userInput.trim());
+            response = String.format("Hi %s! 👋\n\n" +
+                    "Thank you for reaching out to PayuFin! ✅\n\n" +
+                    "We're here to help you with your loan application.\n\n" +
+                    "To get started, please provide your PAN number.\n\n" +
+                    "📄 *Sample format: ABCDE1234F*\n\n" +
+                    "Please type only your PAN number in your response.", nameToUse);
         }
         
         return response;
@@ -92,26 +123,60 @@ public class LendingWorkflowService {
      * Handle create application stage
      */
     private String handleCreateApplication(String mobileId, String userInput) {
-        String applicationId = "APP" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        
-        Optional<UserDetails> userDetailsOpt = userDetailsRepository.findById(mobileId);
-        if (userDetailsOpt.isPresent()) {
-            UserDetails userDetails = userDetailsOpt.get();
-            userDetails.setApplicationId(applicationId);
-            userDetailsRepository.save(userDetails);
+        if (mobileId == null) {
+            return "We couldn't identify your account. Please try again.";
         }
+
+        String rawPanInput = userInput;
+        String normalizedPan = normalizePan(rawPanInput);
         
-        updateStage(mobileId, ApplicationStages.KYC_IN_PROGRESS);
-        
-        return String.format("Great! Your application ID is: %s\n\n" +
-                "Now let's complete your KYC (Know Your Customer) process.\n\n" +
-                "Please provide your Aadhaar number (12 digits):", applicationId);
+        if (!StringUtils.hasText(normalizedPan)) {
+            return buildPanValidationErrorResponse(mobileId,
+                    "we didn't receive your PAN. Please reply with it in the format ABCDE1234F.");
+        }
+
+        if (!PAN_PATTERN.matcher(normalizedPan).matches()) {
+            return buildPanValidationErrorResponse(mobileId,
+                    "the PAN format looks invalid. It should match ABCDE1234F (5 letters, 4 digits, 1 letter).");
+        }
+
+        try {
+            UserDetails userDetails = userDetailsRepository.findById(mobileId)
+                    .orElseGet(() -> {
+                        UserDetails details = new UserDetails();
+                        details.setMobileId(mobileId);
+                        details.setCurrentStage(ApplicationStages.defaultStage().name());
+                        return details;
+                    });
+
+            if (!StringUtils.hasText(userDetails.getApplicationId())) {
+                userDetails.setApplicationId(generateApplicationId());
+            }
+
+            userDetails.setPan(normalizedPan);
+            userDetailsRepository.save(userDetails);
+
+            updateStage(mobileId, ApplicationStages.APPLICATION_UPDATE_IN_PROGRESS);
+
+            return String.format("Great! Your application ID is: %s\n\n" +
+                    "PAN verified successfully. ✅\n\n" +
+                    "Next, please share the bank account number where you'd like the loan credited (digits only, 9-18 digits).",
+                    userDetails.getApplicationId());
+        } catch (Exception ex) {
+            logger.error("Failed to persist PAN for user {}", mobileId, ex);
+            return buildPanValidationErrorResponse(mobileId,
+                    "we ran into a technical issue while saving your PAN. Please try again in a moment.");
+        }
     }
     
     /**
      * Handle KYC stage
      */
     private String handleKYC(String mobileId, String userInput) {
+        if (mobileId == null || userInput == null || userInput.trim().isEmpty()) {
+            return "Please provide your Aadhaar number to continue.";
+        }
+        
         Optional<UserDetails> userDetailsOpt = userDetailsRepository.findById(mobileId);
         
         if (!userDetailsOpt.isPresent()) {
@@ -120,32 +185,8 @@ public class LendingWorkflowService {
         
         UserDetails userDetails = userDetailsOpt.get();
         
-        // Check if Aadhaar is already provided
-        if (userDetails.getAadhaar() != null && !userDetails.getAadhaar().isEmpty()) {
-            // Aadhaar already provided, move to eligibility
-            updateStage(mobileId, ApplicationStages.ELIGIBILITY_IN_PROGRESS);
-            return "✅ **Thank you! Your Aadhaar details have been securely saved.**\n\n" +
-                    "📋 **KYC Information Updated Successfully**\n\n" +
-                    "---\n\n" +
-                    "**Next Step: Eligibility Assessment**\n\n" +
-                    "To proceed with checking your loan eligibility, we require your consent to:\n\n" +
-                    "• Access your credit bureau report (CIBIL/Experian/Equifax)\n" +
-                    "• Verify your financial profile and credit history\n" +
-                    "• Assess your loan eligibility based on our lending criteria\n\n" +
-                    "**Your data is secure and will be used solely for loan processing purposes.**\n\n" +
-                    "💬 **Please reply with 'YES, I CONSENT' or 'PROCEED' to authorize the eligibility check.**\n\n" +
-                    "---\n" +
-                    "*By proceeding, you agree to our credit assessment process and data usage for loan evaluation.*";
-        }
-        
         // Validate and save Aadhaar
         String aadhaarInput = userInput.trim();
-        
-        // Check if input is empty
-        if (aadhaarInput.isEmpty()) {
-            return "❌ Aadhaar number cannot be empty.\n\n" +
-                    "Please provide your Aadhaar number (12 digits):";
-        }
         
         // Remove spaces and hyphens if any
         aadhaarInput = aadhaarInput.replaceAll("[\\s-]", "");
@@ -629,10 +670,49 @@ public class LendingWorkflowService {
     }
     
     /**
-     * Update stage for user
+     * Handle application update stage - validate bank account number
      */
     private String handleApplicationUpdate(String mobileId, String userInput) {
-        return "Application update journey is currently in progress. Please hold on while we complete this step.";
+        if (mobileId == null) {
+            return "We couldn't identify your account. Please try again.";
+        }
+
+        if (userInput == null || userInput.trim().isEmpty()) {
+            return "❌ Bank account number cannot be empty.\n\n" +
+                    "Please provide your bank account number (digits only, 9-18 digits):";
+        }
+
+        String bankAccountInput = userInput.trim().replaceAll("[\\s-]", "");
+
+        // Validate bank account format: 9-18 digits
+        if (!BANK_ACCOUNT_PATTERN.matcher(bankAccountInput).matches()) {
+            return "❌ Invalid bank account number format.\n\n" +
+                    "Bank account number must be between 9 and 18 digits (numbers only).\n\n" +
+                    "Please provide your bank account number again:";
+        }
+
+        try {
+            Optional<UserDetails> userDetailsOpt = userDetailsRepository.findById(mobileId);
+            
+            if (!userDetailsOpt.isPresent()) {
+                return "User details not found. Please start from the beginning.";
+            }
+
+            UserDetails userDetails = userDetailsOpt.get();
+            userDetails.setBankAccountNumber(bankAccountInput);
+            userDetailsRepository.save(userDetails);
+
+            // Move to KYC stage
+            updateStage(mobileId, ApplicationStages.KYC_IN_PROGRESS);
+
+            return "✅ Bank account number verified successfully!\n\n" +
+                    "Your bank details have been saved.\n\n" +
+                    "**Next Step: KYC Verification**\n\n" +
+                    "Please provide your Aadhaar number (12 digits):";
+        } catch (Exception ex) {
+            logger.error("Failed to persist bank account for user {}", mobileId, ex);
+            return "❌ We ran into a technical issue while saving your bank account number. Please try again in a moment.";
+        }
     }
     
     private String handleDocumentSigning(String mobileId, String userInput) {
@@ -741,6 +821,62 @@ public class LendingWorkflowService {
         } else {
             logger.warn("Unable to update stage for {} because user details do not exist", mobileId);
         }
+    }
+    
+    /**
+     * Helper method to get mobile ID from request
+     */
+    private String getMobileId(MessageProcessorRequestDTO request) {
+        if (request == null || request.getUserDetails() == null) {
+            return null;
+        }
+        return request.getUserDetails().getMobileId();
+    }
+    
+    /**
+     * Helper method to get user name from request
+     */
+    private String getUserName(MessageProcessorRequestDTO request) {
+        if (request == null || request.getMessageContext() == null) {
+            return null;
+        }
+        return request.getMessageContext().getUserName();
+    }
+    
+    /**
+     * Helper method to get user input from request
+     */
+    private String getUserInput(MessageProcessorRequestDTO request) {
+        if (request == null || request.getMessageContext() == null) {
+            return null;
+        }
+        return request.getMessageContext().getMessageBody();
+    }
+    
+    /**
+     * Normalize PAN input by removing spaces, hyphens, and converting to uppercase
+     */
+    private String normalizePan(String rawPanInput) {
+        if (rawPanInput == null || rawPanInput.trim().isEmpty()) {
+            return null;
+        }
+        return rawPanInput.trim().replaceAll("[\\s-]", "").toUpperCase();
+    }
+    
+    /**
+     * Build error response for PAN validation failures
+     */
+    private String buildPanValidationErrorResponse(String mobileId, String errorMessage) {
+        return String.format("❌ Sorry, %s\n\n" +
+                "Please try again with a valid PAN number.\n\n" +
+                "📄 *Format: ABCDE1234F (5 letters, 4 digits, 1 letter)*", errorMessage);
+    }
+    
+    /**
+     * Generate a unique application ID
+     */
+    private String generateApplicationId() {
+        return "APP" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }
 

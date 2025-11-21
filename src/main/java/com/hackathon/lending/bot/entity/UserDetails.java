@@ -22,6 +22,9 @@ public class UserDetails {
     @Column(name = "aadhaar", length = 12)
     private String aadhaar;
     
+    @Column(name = "bank_account_number", length = 20)
+    private String bankAccountNumber;
+    
     @Column(name = "current_stage", length = 50)
     private String currentStage;
     
@@ -81,6 +84,14 @@ public class UserDetails {
     
     public void setAadhaar(String aadhaar) {
         this.aadhaar = aadhaar;
+    }
+    
+    public String getBankAccountNumber() {
+        return bankAccountNumber;
+    }
+    
+    public void setBankAccountNumber(String bankAccountNumber) {
+        this.bankAccountNumber = bankAccountNumber;
     }
     
     public String getCurrentStage() {
