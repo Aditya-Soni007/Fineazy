@@ -1,4 +1,9 @@
+> [!TIP]
 > Refer documentation directory for detailed documentations
+
+> [!NOTE]
+> Video Demo : https://paysense1.sharepoint.com/:v:/s/Finhack-Nov-2025-Submissions/IQC484Ki0APTS7Hi1MbHul4zAUKZyXINGNL5YcM5a4fpN6g?e=1nc3oY
+
 
 # WhatsApp Lending Bot
 
